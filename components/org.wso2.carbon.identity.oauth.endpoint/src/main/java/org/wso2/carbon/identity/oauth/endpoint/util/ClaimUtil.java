@@ -53,6 +53,7 @@ import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -127,8 +128,8 @@ public class ClaimUtil {
             }
             ClaimMapping[] requestedLocalClaimMap = serviceProvider.getClaimConfig().getClaimMappings();
             String subjectClaimURI = serviceProvider.getLocalAndOutBoundAuthenticationConfig().getSubjectClaimUri();
-            if (serviceProvider.getClaimConfig().getClaimMappings() != null) {
-                for (ClaimMapping claimMapping : serviceProvider.getClaimConfig().getClaimMappings()) {
+            if (requestedLocalClaimMap != null) {
+                for (ClaimMapping claimMapping : requestedLocalClaimMap) {
                     if (claimMapping.getRemoteClaim().getClaimUri().equals(subjectClaimURI)) {
                         subjectClaimURI = claimMapping.getLocalClaim().getClaimUri();
                         break;
@@ -142,11 +143,14 @@ public class ClaimUtil {
 
             boolean isSubjectClaimInRequested = false;
             if (subjectClaimURI != null || requestedLocalClaimMap != null && requestedLocalClaimMap.length > 0) {
-                for (ClaimMapping claimMapping : requestedLocalClaimMap) {
-                    if (claimMapping.isRequested()) {
-                        claimURIList.add(claimMapping.getLocalClaim().getClaimUri());
-                        if (claimMapping.getLocalClaim().getClaimUri().equals(subjectClaimURI)) {
-                            isSubjectClaimInRequested = true;
+
+                if (requestedLocalClaimMap != null) {
+                    for (ClaimMapping claimMapping : requestedLocalClaimMap) {
+                        if (claimMapping.isRequested()) {
+                            claimURIList.add(claimMapping.getLocalClaim().getClaimUri());
+                            if (claimMapping.getLocalClaim().getClaimUri().equals(subjectClaimURI)) {
+                                isSubjectClaimInRequested = true;
+                            }
                         }
                     }
                 }
@@ -158,7 +162,7 @@ public class ClaimUtil {
                         (SP_DIALECT, null, userTenantDomain, true);
 
                 Map<String, String> userClaims = userstore.getUserClaimValues(MultitenantUtils.getTenantAwareUsername
-                        (username), claimURIList.toArray(new    String[claimURIList.size()]), null);
+                        (username), claimURIList.toArray(new String[claimURIList.size()]), null);
                 if (log.isDebugEnabled()) {
                     log.debug("User claims retrieved from user store: " + userClaims.size());
                 }
@@ -222,30 +226,33 @@ public class ClaimUtil {
      * @param locallyMappedUserRoles
      */
     public static String getServiceProviderMappedUserRoles(ServiceProvider serviceProvider,
-            List<String> locallyMappedUserRoles, String claimSeparator) throws FrameworkException {
+                                                           List<String> locallyMappedUserRoles,
+                                                           String claimSeparator) throws FrameworkException {
+
         if (CollectionUtils.isNotEmpty(locallyMappedUserRoles)) {
+            // SP to local role mappings
             RoleMapping[] localToSpRoleMapping = serviceProvider.getPermissionAndRoleConfig().getRoleMappings();
-            if (ArrayUtils.isEmpty(localToSpRoleMapping)) {
-                return null;
-            }
-
-            StringBuilder spMappedUserRoles = new StringBuilder();
-            for (RoleMapping roleMapping : localToSpRoleMapping) {
-                if (locallyMappedUserRoles.contains(roleMapping.getLocalRole().getLocalRoleName())) {
-                    spMappedUserRoles.append(roleMapping.getRemoteRole()).append(claimSeparator);
-                    locallyMappedUserRoles.remove(roleMapping.getLocalRole().getLocalRoleName());
+            List<String> spMappedRoles;
+            if (ArrayUtils.isNotEmpty(localToSpRoleMapping)) {
+                spMappedRoles = new ArrayList<>();
+                // Iterate through role mappings and add sp role mapped ones to a list
+                for (RoleMapping roleMapping : localToSpRoleMapping) {
+                    String localRoleName = roleMapping.getLocalRole().getLocalRoleName();
+                    if (locallyMappedUserRoles.contains(localRoleName)) {
+                        spMappedRoles.add(roleMapping.getRemoteRole());
+                        locallyMappedUserRoles.removeAll(Collections.singletonList(localRoleName));
+                    }
                 }
+                // Add the unmapped local roles
+                spMappedRoles.addAll(locallyMappedUserRoles);
+            } else {
+                // No SP Role mappings. Need to return local roles as it is
+                spMappedRoles = locallyMappedUserRoles;
             }
 
-            for (String remainingRole : locallyMappedUserRoles) {
-                spMappedUserRoles.append(remainingRole).append(claimSeparator);
-            }
-
-            return spMappedUserRoles.length() > 0 ?
-                    spMappedUserRoles.toString().substring(0, spMappedUserRoles.length() - 1) :
-                    null;
+            return StringUtils.join(spMappedRoles.toArray(), claimSeparator);
         }
-
+        // No local role for the user to be mapped to service provider role mappings.
         return null;
     }
 }

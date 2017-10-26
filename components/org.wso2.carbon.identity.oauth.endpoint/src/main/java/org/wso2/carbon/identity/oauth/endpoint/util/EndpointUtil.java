@@ -19,7 +19,6 @@ package org.wso2.carbon.identity.oauth.endpoint.util;
 
 import org.apache.axiom.util.base64.Base64Utils;
 import org.apache.commons.io.Charsets;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,6 +32,7 @@ import org.wso2.carbon.identity.application.authentication.framework.cache.Authe
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticationRequest;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
+import org.wso2.carbon.identity.application.mgt.ApplicationManagementService;
 import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.discovery.DefaultOIDCProcessor;
 import org.wso2.carbon.identity.discovery.OIDCProcessor;
@@ -186,15 +186,17 @@ public class EndpointUtil {
      */
     public static String[] extractCredentialsFromAuthzHeader(String authorizationHeader)
             throws OAuthClientException {
+
+        if (authorizationHeader == null) {
+            throw new OAuthClientException("Authorization header value is null");
+        }
         String[] splitValues = authorizationHeader.trim().split(" ");
         if (splitValues.length == 2) {
             byte[] decodedBytes = Base64Utils.decode(splitValues[1].trim());
-            if (decodedBytes != null) {
-                String userNamePassword = new String(decodedBytes, Charsets.UTF_8);
-                String[] credentials = userNamePassword.split(":");
-                if (ArrayUtils.isNotEmpty(credentials) && credentials.length == 2) {
-                    return credentials;
-                }
+            String userNamePassword = new String(decodedBytes, Charsets.UTF_8);
+            String[] credentials = userNamePassword.split(":");
+            if (credentials.length == 2) {
+                return credentials;
             }
         }
         String errMsg = "Error decoding authorization header. Space delimited \"<authMethod> <base64Hash>\" format " +
@@ -226,7 +228,7 @@ public class EndpointUtil {
 
         if (appName != null) {
             try {
-                errorPageUrl += "application" + "=" + URLEncoder.encode(appName, "UTF-8");
+                errorPageUrl += "&application" + "=" + URLEncoder.encode(appName, "UTF-8");
             } catch (UnsupportedEncodingException e) {
                 //ignore
                 if (log.isDebugEnabled()){
@@ -397,10 +399,16 @@ public class EndpointUtil {
             }
             if (params != null) {
                 consentPage += "?" + OAuthConstants.OIDC_LOGGED_IN_USER + "=" + URLEncoder.encode(loggedInUser,
-                        "UTF-8") + "&application=" + URLEncoder.encode(params.getApplicationName(), "ISO-8859-1") +
-                        "&" + OAuthConstants.OAuth20Params.SCOPE + "=" + URLEncoder.encode(EndpointUtil.getScope
-                        (params), "ISO-8859-1") + "&" + OAuthConstants.SESSION_DATA_KEY_CONSENT + "=" + URLEncoder
-                        .encode(sessionDataKeyConsent, "UTF-8") + "&spQueryParams=" + queryString;
+                        "UTF-8") + "&application=";
+
+                if (StringUtils.isNotEmpty(params.getDisplayName())) {
+                    consentPage += URLEncoder.encode(params.getDisplayName(), "UTF-8");
+                } else {
+                    consentPage += URLEncoder.encode(params.getApplicationName(), "UTF-8");
+                }
+                consentPage = consentPage + "&" + OAuthConstants.OAuth20Params.SCOPE + "=" + URLEncoder.encode
+                        (EndpointUtil.getScope(params), "UTF-8") + "&" + OAuthConstants.SESSION_DATA_KEY_CONSENT
+                        + "=" + URLEncoder.encode(sessionDataKeyConsent, "UTF-8") + "&spQueryParams=" + queryString;
             } else {
                 throw new OAuthSystemException("Error while retrieving the application name");
             }
@@ -419,6 +427,15 @@ public class EndpointUtil {
         return scopes.toString().trim();
     }
 
+    /**
+     * Returns the {@code ApplicationAuthenticationService} instance
+     *
+     * @return
+     */
+    public static ApplicationManagementService getApplicationManagementService() {
+        return (ApplicationManagementService) PrivilegedCarbonContext.getThreadLocalCarbonContext().getOSGiService
+                (ApplicationManagementService.class);
+    }
     public static String getRealmInfo() {
         return "Basic realm=" + getHostName();
     }
