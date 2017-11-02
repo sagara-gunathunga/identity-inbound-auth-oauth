@@ -24,9 +24,6 @@ import org.wso2.carbon.identity.oauth.common.OAuthConstants;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
 import org.wso2.carbon.identity.oauth2.model.AuthzCodeDO;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.BlockingDeque;
 
 /**
@@ -57,7 +54,9 @@ public class AuthPersistenceTask implements Runnable {
                             log.debug("Auth Token Data removing Task is started to run");
                         }
                         TokenMgtDAO tokenMgtDAO = new TokenMgtDAO();
-                        tokenMgtDAO.doChangeAuthzCodeState(authContextTokenDO.getAuthzCode(),
+                        OAuthTokenPersistenceFactory.getInstance()
+                                .getAuthorizationCodeDAO().updateAuthorizationCodeState(authContextTokenDO
+                                        .getAuthzCode(),
                                 OAuthConstants.AuthorizationCodeState.EXPIRED);
                     } else if (authContextTokenDO.getAuthzCodeDO() == null && authContextTokenDO.getTokenId() != null) {
                         if (log.isDebugEnabled()) {
@@ -67,13 +66,16 @@ public class AuthPersistenceTask implements Runnable {
                         authzCodeDO.setAuthorizationCode(authContextTokenDO.getAuthzCode());
                         authzCodeDO.setOauthTokenId(authContextTokenDO.getTokenId());
                         TokenMgtDAO tokenMgtDAO = new TokenMgtDAO();
-                        tokenMgtDAO.deactivateAuthorizationCode(authzCodeDO);
+                        OAuthTokenPersistenceFactory.getInstance()
+                                .getAuthorizationCodeDAO().deactivateAuthorizationCode(authzCodeDO);
                     } else {
                         if (log.isDebugEnabled()) {
                             log.debug("Auth Token Data persisting Task is started to run");
                         }
                         TokenMgtDAO tokenMgtDAO = new TokenMgtDAO();
-                        tokenMgtDAO.persistAuthorizationCode(authContextTokenDO.getAuthzCode(),
+                        OAuthTokenPersistenceFactory.getInstance().getAuthorizationCodeDAO()
+                                .insertAuthorizationCode(authContextTokenDO
+                                        .getAuthzCode(),
                                 authContextTokenDO.getConsumerKey(), authContextTokenDO.getCallbackUrl(),
                                 authContextTokenDO.getAuthzCodeDO());
                     }

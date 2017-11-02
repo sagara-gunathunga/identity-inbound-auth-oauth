@@ -35,6 +35,7 @@ import org.wso2.carbon.identity.oauth.config.OAuthServerConfiguration;
 import org.wso2.carbon.identity.oauth.dao.OAuthAppDO;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
 import org.wso2.carbon.identity.oauth2.ResponseHeader;
+import org.wso2.carbon.identity.oauth2.dao.OAuthTokenPersistenceFactory;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AccessTokenReqDTO;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AccessTokenRespDTO;
 import org.wso2.carbon.identity.oauth2.model.AccessTokenDO;
@@ -69,8 +70,8 @@ public class RefreshGrantHandler extends AbstractAuthorizationGrantHandler {
 
         String refreshToken = tokenReqDTO.getRefreshToken();
 
-        RefreshTokenValidationDataDO validationDataDO = tokenMgtDAO.validateRefreshToken(
-                tokenReqDTO.getClientId(), refreshToken);
+        RefreshTokenValidationDataDO validationDataDO = OAuthTokenPersistenceFactory.getInstance()
+                .getTokenManagementDAO().validateRefreshToken(tokenReqDTO.getClientId(), refreshToken);
 
         if (validationDataDO.getAccessToken() == null) {
             if (log.isDebugEnabled()) {
@@ -104,9 +105,9 @@ public class RefreshGrantHandler extends AbstractAuthorizationGrantHandler {
         }
 
         if (!OAuthConstants.TokenStates.TOKEN_STATE_ACTIVE.equals(validationDataDO.getRefreshTokenState())) {
-            List<AccessTokenDO> accessTokenDOs = tokenMgtDAO.retrieveLatestAccessTokens(
-                    tokenReqDTO.getClientId(), validationDataDO.getAuthorizedUser(), userStoreDomain,
-                    OAuth2Util.buildScopeString(validationDataDO.getScope()), true, 10);
+            List<AccessTokenDO> accessTokenDOs = OAuthTokenPersistenceFactory.getInstance().getAccessTokenDAO()
+                    .getLatestAccessTokens(tokenReqDTO.getClientId(), validationDataDO.getAuthorizedUser(),
+                            userStoreDomain, OAuth2Util.buildScopeString(validationDataDO.getScope()), true, 10);
             boolean isLatest = false;
             if (accessTokenDOs == null || accessTokenDOs.isEmpty()) {
                 if (log.isDebugEnabled()) {
@@ -207,8 +208,9 @@ public class RefreshGrantHandler extends AbstractAuthorizationGrantHandler {
 
         // an active or expired token will be returned. since we do the validation for active or expired token in
         // validateGrant() no need to do it here again
-        RefreshTokenValidationDataDO refreshTokenValidationDataDO = tokenMgtDAO
-                .validateRefreshToken(oauth2AccessTokenReqDTO.getClientId(), oauth2AccessTokenReqDTO.getRefreshToken());
+        RefreshTokenValidationDataDO refreshTokenValidationDataDO = OAuthTokenPersistenceFactory.getInstance()
+                .getTokenManagementDAO().validateRefreshToken(oauth2AccessTokenReqDTO.getClientId(),
+                        oauth2AccessTokenReqDTO.getRefreshToken());
 
         long issuedTime = refreshTokenValidationDataDO.getIssuedTime().getTime();
         long refreshValidityMillis = refreshTokenValidationDataDO.getValidityPeriodInMillis();
@@ -321,9 +323,10 @@ public class RefreshGrantHandler extends AbstractAuthorizationGrantHandler {
 
         String authorizedUser = tokReqMsgCtx.getAuthorizedUser().toString();
 	    // set the previous access token state to "INACTIVE" and store new access token in single db connection
-	    tokenMgtDAO.invalidateAndCreateNewToken(oldAccessToken.getTokenId(), OAuthConstants.TokenStates.TOKEN_STATE_INACTIVE, clientId,
-	                                            UUID.randomUUID().toString(), accessTokenDO,
-	                                            userStoreDomain);
+	    OAuthTokenPersistenceFactory.getInstance().getAccessTokenDAO()
+                .invalidateAndCreateNewAccessToken(oldAccessToken.getTokenId(),
+                        OAuthConstants.TokenStates.TOKEN_STATE_INACTIVE, clientId,
+                        UUID.randomUUID().toString(), accessTokenDO, userStoreDomain);
         if (!accessToken.equals(accessTokenDO.getAccessToken())) {
             // Using latest active token.
             accessToken = accessTokenDO.getAccessToken();

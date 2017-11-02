@@ -41,9 +41,11 @@ import org.wso2.carbon.identity.oauth.event.OAuthEventInterceptor;
 import org.wso2.carbon.identity.oauth.internal.OAuthComponentServiceHolder;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
 import org.wso2.carbon.identity.oauth2.authz.OAuthAuthzReqMessageContext;
+import org.wso2.carbon.identity.oauth2.dao.OAuthTokenPersistenceFactory;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AuthorizeReqDTO;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AuthorizeRespDTO;
 import org.wso2.carbon.identity.oauth2.model.AccessTokenDO;
+import org.wso2.carbon.identity.oauth2.model.AuthzCodeDO;
 import org.wso2.carbon.identity.oauth2.util.OAuth2Util;
 import org.wso2.carbon.identity.openidconnect.IDTokenBuilder;
 
@@ -198,8 +200,9 @@ public class TokenResponseTypeHandler extends AbstractResponseTypeHandler {
             }
 
             // check if the last issued access token is still active and valid in the database
-            AccessTokenDO existingAccessTokenDO = tokenMgtDAO.retrieveLatestAccessToken(
-                    consumerKey, authorizationReqDTO.getUser(), userStoreDomain, scope, false);
+            AccessTokenDO existingAccessTokenDO = OAuthTokenPersistenceFactory.getInstance()
+                    .getAccessTokenDAO().getLatestAccessToken(consumerKey, authorizationReqDTO.getUser(),
+                            userStoreDomain, scope, false);
 
             if (existingAccessTokenDO != null) {
 
@@ -373,8 +376,11 @@ public class TokenResponseTypeHandler extends AbstractResponseTypeHandler {
 
             // Persist the access token in database
             try {
-                tokenMgtDAO.storeAccessToken(accessToken, authorizationReqDTO.getConsumerKey(),
-                        newAccessTokenDO, existingAccessTokenDO, userStoreDomain);
+               OAuthTokenPersistenceFactory.getInstance().getAccessTokenDAO().insertAccessToken
+                        (accessToken, authorizationReqDTO.getConsumerKey(),newAccessTokenDO,
+                                existingAccessTokenDO,userStoreDomain);
+                deactivateCurrentAuthorizationCode(newAccessTokenDO.getAuthorizationCode(),
+                            newAccessTokenDO.getTokenId());
                 if (!accessToken.equals(newAccessTokenDO.getAccessToken())) {
                     // Using latest active token.
                     accessToken = newAccessTokenDO.getAccessToken();
@@ -431,6 +437,18 @@ public class TokenResponseTypeHandler extends AbstractResponseTypeHandler {
 
         triggerPostListeners(oauthAuthzMsgCtx, tokenDO, respDTO);
         return respDTO;
+    }
+
+    private void deactivateCurrentAuthorizationCode(String authorizationCode, String tokenId)
+            throws IdentityOAuth2Exception {
+
+        if(authorizationCode != null){
+            AuthzCodeDO authzCodeDO = new AuthzCodeDO();
+            authzCodeDO.setAuthorizationCode(authorizationCode);
+            authzCodeDO.setOauthTokenId(tokenId);
+            OAuthTokenPersistenceFactory.getInstance()
+                    .getAuthorizationCodeDAO().deactivateAuthorizationCode(authzCodeDO);
+        }
     }
 
     private void triggerPostListeners(OAuthAuthzReqMessageContext

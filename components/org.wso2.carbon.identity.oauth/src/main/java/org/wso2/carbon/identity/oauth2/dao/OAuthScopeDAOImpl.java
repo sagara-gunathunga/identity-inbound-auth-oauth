@@ -1,17 +1,21 @@
 /*
- *  Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ *   Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *   WSO2 Inc. licenses this file to you under the Apache License,
+ *   Version 2.0 (the "License"); you may not use this file except
+ *   in compliance with the License.
+ *   You may obtain a copy of the License at
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing,
+ *   software distributed under the License is distributed on an
+ *   "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *   KIND, either express or implied.  See the License for the
+ *   specific language governing permissions and limitations
+ *   under the License.
+ * /
  */
 
 package org.wso2.carbon.identity.oauth2.dao;
@@ -20,7 +24,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.core.util.IdentityDatabaseUtil;
-import org.wso2.carbon.identity.oauth2.IdentityOAuth2ScopeClientException;
+import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2ScopeException;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2ScopeServerException;
 import org.wso2.carbon.identity.oauth2.Oauth2ScopeConstants;
@@ -32,19 +36,16 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.Set;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.Set;
 
-/**
- * Data Access Layer functionality for Scope management. This includes storing, updating, deleting and retrieving scopes
- */
-@Deprecated
-public class ScopeMgtDAO {
-    private static final Log log = LogFactory.getLog(ScopeMgtDAO.class);
+public class OAuthScopeDAOImpl implements OAuthScopeDAO {
+
+    private final Log log = LogFactory.getLog(OAuthScopeDAOImpl.class);
 
     /**
      * Add a scope
@@ -53,6 +54,7 @@ public class ScopeMgtDAO {
      * @param tenantID tenant ID
      * @throws IdentityOAuth2ScopeException IdentityOAuth2ScopeException
      */
+    @Override
     public void addScope(Scope scope, int tenantID) throws IdentityOAuth2ScopeException {
 
         if (scope == null) {
@@ -79,7 +81,6 @@ public class ScopeMgtDAO {
         }
     }
 
-
     /**
      * Get all available scopes
      *
@@ -87,6 +88,7 @@ public class ScopeMgtDAO {
      * @return available scope list
      * @throws IdentityOAuth2ScopeServerException IdentityOAuth2ScopeServerException
      */
+    @Override
     public Set<Scope> getAllScopes(int tenantID) throws IdentityOAuth2ScopeServerException {
 
         if (log.isDebugEnabled()) {
@@ -147,6 +149,7 @@ public class ScopeMgtDAO {
      * @return available scope list
      * @throws IdentityOAuth2ScopeServerException IdentityOAuth2ScopeServerException
      */
+    @Override
     public Set<Scope> getScopesWithPagination(Integer offset, Integer limit, int tenantID) throws IdentityOAuth2ScopeServerException {
 
         if (log.isDebugEnabled()) {
@@ -230,6 +233,7 @@ public class ScopeMgtDAO {
      * @return Scope for the provided ID
      * @throws IdentityOAuth2ScopeServerException IdentityOAuth2ScopeServerException
      */
+    @Override
     public Scope getScopeByName(String name, int tenantID) throws IdentityOAuth2ScopeServerException {
 
         if (log.isDebugEnabled()) {
@@ -273,10 +277,11 @@ public class ScopeMgtDAO {
      * Get existence of scope for the provided scope name
      *
      * @param scopeName name of the scope
-     * @param tenantID tenant ID
+     * @param tenantID  tenant ID
      * @return true if scope is exists
      * @throws IdentityOAuth2ScopeServerException IdentityOAuth2ScopeServerException
      */
+    @Override
     public boolean isScopeExists(String scopeName, int tenantID) throws IdentityOAuth2ScopeServerException {
 
         if (log.isDebugEnabled()) {
@@ -299,6 +304,7 @@ public class ScopeMgtDAO {
      * @return scope ID for the provided scope name
      * @throws IdentityOAuth2ScopeServerException IdentityOAuth2ScopeServerException
      */
+    @Override
     public int getScopeIDByName(String scopeName, int tenantID) throws IdentityOAuth2ScopeServerException {
 
         if (log.isDebugEnabled()) {
@@ -331,6 +337,7 @@ public class ScopeMgtDAO {
      * @param tenantID tenant ID
      * @throws IdentityOAuth2ScopeServerException IdentityOAuth2ScopeServerException
      */
+    @Override
     public void deleteScopeByName(String name, int tenantID) throws IdentityOAuth2ScopeServerException {
 
         if (log.isDebugEnabled()) {
@@ -354,6 +361,7 @@ public class ScopeMgtDAO {
      * @param tenantID     tenant ID
      * @throws IdentityOAuth2ScopeServerException IdentityOAuth2ScopeServerException
      */
+    @Override
     public void updateScopeByName(Scope updatedScope, int tenantID) throws IdentityOAuth2ScopeServerException {
 
         if (log.isDebugEnabled()) {
@@ -418,10 +426,151 @@ public class ScopeMgtDAO {
     }
 
     private void deleteScope(String name, int tenantID, Connection conn) throws SQLException {
+
         try (PreparedStatement ps = conn.prepareStatement(SQLQueries.DELETE_SCOPE_BY_NAME)) {
             ps.setString(1, name);
             ps.setInt(2, tenantID);
             ps.execute();
         }
     }
+
+    /**
+     * This method is to get resource scope key of the resource uri
+     *
+     * @param resourceUri Resource Path
+     * @return Scope key of the resource
+     * @throws IdentityOAuth2Exception if failed to find the resource scope
+     */
+    @Deprecated
+    public String findScopeOfResource(String resourceUri) throws IdentityOAuth2Exception {
+
+        if (log.isDebugEnabled()) {
+            log.debug("Retrieving scope for resource: " + resourceUri);
+        }
+        String sql = SQLQueries.RETRIEVE_SCOPE_NAME_FOR_RESOURCE;
+        try (Connection connection = IdentityDatabaseUtil.getDBConnection();
+             PreparedStatement ps = connection.prepareStatement(sql);) {
+
+            ps.setString(1, resourceUri);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("NAME");
+                }
+            }
+            return null;
+        } catch (SQLException e) {
+            String errorMsg = "Error getting scopes for resource - " + resourceUri + " : " + e.getMessage();
+            throw new IdentityOAuth2Exception(errorMsg, e);
+        }
+    }
+
+    @Override
+    public boolean validateScope(Connection connection, String accessToken, String resourceUri) {
+
+        return false;
+    }
+
+    /**
+     * Get the list of roles associated for a given scope.
+     *
+     * @param scopeName name of the scope.
+     * @param tenantId  Tenant Id
+     * @return The Set of roles associated with the given scope.
+     * @throws IdentityOAuth2Exception If an SQL error occurs while retrieving the roles.
+     */
+    @Override
+    public Set<String> getBindingsOfScopeByScopeName(String scopeName, int tenantId) throws IdentityOAuth2Exception {
+
+        if (log.isDebugEnabled()) {
+            log.debug("Retrieving bindings of scope: " + scopeName + " tenant id: " + tenantId);
+        }
+
+        Connection connection = IdentityDatabaseUtil.getDBConnection();
+
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        Set<String> bindings = new HashSet<>();
+
+        try {
+            String sql = SQLQueries.RETRIEVE_BINDINGS_OF_SCOPE_FOR_TENANT;
+
+            ps = connection.prepareStatement(sql);
+            ps.setString(1, scopeName);
+            ps.setInt(2, tenantId);
+            rs = ps.executeQuery();
+
+            while (rs.next()) {
+                String binding = rs.getString("SCOPE_BINDING");
+                if (!binding.isEmpty()) {
+                    bindings.add(binding);
+                }
+            }
+            connection.commit();
+            if (log.isDebugEnabled()) {
+                StringBuilder bindingStringBuilder = new StringBuilder();
+                for (String binding : bindings) {
+                    bindingStringBuilder.append(binding).append(" ");
+                }
+                log.debug("Binding for scope: " + scopeName + " found: " + bindingStringBuilder.toString() + " tenant" +
+                        " id: " + tenantId);
+            }
+            return bindings;
+        } catch (SQLException e) {
+            String errorMsg = "Error getting bindings of scope - " + scopeName;
+            throw new IdentityOAuth2Exception(errorMsg, e);
+        } finally {
+            IdentityDatabaseUtil.closeAllConnections(connection, rs, ps);
+        }
+    }
+
+    /**
+     * Get the list of roles associated for a given scope.
+     *
+     * @param scopeName Name of the scope.
+     * @return The Set of roles associated with the given scope.
+     * @throws IdentityOAuth2Exception If an SQL error occurs while retrieving the roles.
+     */
+    @Deprecated
+    public Set<String> getBindingsOfScopeByScopeName(String scopeName) throws IdentityOAuth2Exception {
+
+        if (log.isDebugEnabled()) {
+            log.debug("Retrieving bindings of scope: " + scopeName);
+        }
+
+        Connection connection = IdentityDatabaseUtil.getDBConnection();
+
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        Set<String> bindings = new HashSet<>();
+
+        try {
+            String sql = SQLQueries.RETRIEVE_BINDINGS_OF_SCOPE;
+
+            ps = connection.prepareStatement(sql);
+            ps.setString(1, scopeName);
+            rs = ps.executeQuery();
+
+            while (rs.next()) {
+                String binding = rs.getString("SCOPE_BINDING");
+                if (!binding.isEmpty()) {
+                    bindings.add(binding);
+                }
+            }
+            connection.commit();
+            if (log.isDebugEnabled()) {
+                StringBuilder bindingsStringBuilder = new StringBuilder();
+                for (String binding : bindings) {
+                    bindingsStringBuilder.append(binding).append(" ");
+                }
+                log.debug("Binding for scope: " + scopeName + " found: " + bindingsStringBuilder.toString());
+            }
+            return bindings;
+        } catch (SQLException e) {
+            String errorMsg = "Error getting roles of scope - " + scopeName;
+            throw new IdentityOAuth2Exception(errorMsg, e);
+        } finally {
+            IdentityDatabaseUtil.closeAllConnections(connection, rs, ps);
+        }
+    }
+
 }

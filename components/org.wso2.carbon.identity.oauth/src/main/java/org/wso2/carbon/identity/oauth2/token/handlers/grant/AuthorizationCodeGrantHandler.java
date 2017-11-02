@@ -18,8 +18,10 @@
 
 package org.wso2.carbon.identity.oauth2.token.handlers.grant;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.wso2.carbon.identity.base.IdentityConstants;
 import org.wso2.carbon.identity.base.IdentityException;
 import org.wso2.carbon.identity.oauth.cache.AppInfoCache;
 import org.wso2.carbon.identity.core.util.IdentityUtil;
@@ -31,6 +33,8 @@ import org.wso2.carbon.identity.oauth.config.OAuthServerConfiguration;
 import org.wso2.carbon.identity.oauth.dao.OAuthAppDAO;
 import org.wso2.carbon.identity.oauth.dao.OAuthAppDO;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
+import org.wso2.carbon.identity.oauth2.dao.AuthorizationCodeValidationResult;
+import org.wso2.carbon.identity.oauth2.dao.OAuthTokenPersistenceFactory;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AccessTokenReqDTO;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AccessTokenRespDTO;
 import org.wso2.carbon.identity.oauth2.model.AccessTokenDO;
@@ -91,7 +95,17 @@ public class AuthorizationCodeGrantHandler extends AbstractAuthorizationGrantHan
 
         // authz Code is not available in cache. check the database
         if (authzCodeDO == null) {
-            authzCodeDO = tokenMgtDAO.validateAuthorizationCode(clientId, authorizationCode);
+            AuthorizationCodeValidationResult validationResult = OAuthTokenPersistenceFactory.getInstance()
+                    .getAuthorizationCodeDAO().validateAuthorizationCode(clientId,authorizationCode);
+            if(validationResult != null){
+                authzCodeDO = validationResult.getAuthzCodeDO();
+
+                //revoking access token issued for authorization code as per RFC 6749 Section 4.1.2
+                if(!validationResult.isActiveCode()){
+                    revokeExsistingAccessTokens(validationResult.getTokenId(), validationResult.getAuthzCodeDO());
+                }
+            }
+
         }
 
         if (authzCodeDO != null && OAuthConstants.AuthorizationCodeState.INACTIVE.equals(authzCodeDO.getState())) {
@@ -161,7 +175,9 @@ public class AuthorizationCodeGrantHandler extends AbstractAuthorizationGrantHan
             }
 
             // remove the authorization code from the database.
-            tokenMgtDAO.changeAuthzCodeState(authorizationCode, OAuthConstants.AuthorizationCodeState.EXPIRED);
+            OAuthTokenPersistenceFactory.getInstance()
+                    .getAuthorizationCodeDAO().updateAuthorizationCodeState(authorizationCode, OAuthConstants
+                    .AuthorizationCodeState.EXPIRED);
             if (log.isDebugEnabled()) {
                 log.debug("Expired Authorization code" +
                         " issued for client " + clientId +
@@ -209,6 +225,21 @@ public class AuthorizationCodeGrantHandler extends AbstractAuthorizationGrantHan
         return true;
     }
 
+    private void revokeExsistingAccessTokens(String tokenId, AuthzCodeDO authzCodeDO) {
+        //revoking access token issued for authorization code as per RFC 6749 Section 4.1.2
+        if (log.isDebugEnabled()) {
+            if (IdentityUtil.isTokenLoggable(IdentityConstants.IdentityTokens.AUTHORIZATION_CODE)) {
+                log.debug("Validated authorization code(hashed): " +  DigestUtils.sha256Hex
+                        (authzCodeDO.getAuthorizationCode()) + " for client: " + authzCodeDO.getConsumerKey() + " is not active. " +
+                        "So " +
+                        "revoking the access tokens issued for the authorization code.");
+            } else {
+                log.debug("Validated authorization code for client: " + authzCodeDO.getConsumerKey() + " is not active" +
+                        ". So revoking the access tokens issued for the authorization code.");
+            }
+        }
+    }
+
     @Override
     public OAuth2AccessTokenRespDTO issue(OAuthTokenReqMessageContext tokReqMsgCtx)
             throws IdentityOAuth2Exception {
@@ -229,7 +260,11 @@ public class AuthorizationCodeGrantHandler extends AbstractAuthorizationGrantHan
         try {
             if (existingTokenUsed){
                 //has given an already issued access token. So the authorization code is not deactivated yet
-                tokenMgtDAO.deactivateAuthorizationCode(authzCode, tokenRespDTO.getTokenId());
+                AuthzCodeDO authzCodeDO = new AuthzCodeDO();
+                authzCodeDO.setAuthorizationCode(authzCode);
+                authzCodeDO.setOauthTokenId(tokenRespDTO.getTokenId());
+                OAuthTokenPersistenceFactory.getInstance().
+                        getAuthorizationCodeDAO().deactivateAuthorizationCode(authzCodeDO);
             }
         } catch (IdentityException e) {
             throw new IdentityOAuth2Exception("Error occurred while deactivating authorization code", e);
@@ -264,8 +299,9 @@ public class AuthorizationCodeGrantHandler extends AbstractAuthorizationGrantHan
             throws IdentityOAuth2Exception {
         try {
             newAccessTokenDO.setAuthorizationCode(oAuth2AccessTokenReqDTO.getAuthorizationCode());
-            tokenMgtDAO.storeAccessToken(newAccessToken, oAuth2AccessTokenReqDTO.getClientId(),
-                                         newAccessTokenDO, existingAccessTokenDO, userStoreDomain);
+            OAuthTokenPersistenceFactory.getInstance().getAccessTokenDAO()
+                    .insertAccessToken(newAccessToken, oAuth2AccessTokenReqDTO
+                            .getClientId(), newAccessTokenDO, existingAccessTokenDO, userStoreDomain);
         } catch (IdentityException e) {
             throw new IdentityOAuth2Exception(
                     "Error occurred while storing new access token", e);

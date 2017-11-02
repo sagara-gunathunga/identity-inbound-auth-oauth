@@ -31,6 +31,7 @@ import org.wso2.carbon.identity.oauth.dao.OAuthAppDAO;
 import org.wso2.carbon.identity.oauth.dao.OAuthAppDO;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
 import org.wso2.carbon.identity.oauth2.authz.OAuthAuthzReqMessageContext;
+import org.wso2.carbon.identity.oauth2.dao.OAuthTokenPersistenceFactory;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AuthorizeReqDTO;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AuthorizeRespDTO;
 import org.wso2.carbon.identity.oauth2.model.AuthzCodeDO;
@@ -102,8 +103,8 @@ public class CodeResponseTypeHandler extends AbstractResponseTypeHandler {
                 authorizationReqDTO.getConsumerKey(), authorizationCode, codeId,
                 authorizationReqDTO.getPkceCodeChallenge(), authorizationReqDTO.getPkceCodeChallengeMethod());
 
-        tokenMgtDAO.storeAuthorizationCode(authorizationCode, authorizationReqDTO.getConsumerKey(),
-                authorizationReqDTO.getCallbackUrl(), authzCodeDO);
+        OAuthTokenPersistenceFactory.getInstance().getAuthorizationCodeDAO().insertAuthorizationCode(authorizationCode,
+                authorizationReqDTO.getConsumerKey(), authorizationReqDTO.getCallbackUrl(), authzCodeDO);
 
         if (cacheEnabled) {
             // Cache the authz Code, here we prepend the client_key to avoid collisions with

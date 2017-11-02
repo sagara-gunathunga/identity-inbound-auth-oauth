@@ -32,7 +32,6 @@ import org.wso2.carbon.identity.oauth.config.OAuthServerConfiguration;
 import org.wso2.carbon.identity.oauth.dao.OAuthAppDO;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
 import org.wso2.carbon.identity.oauth2.authz.OAuthAuthzReqMessageContext;
-import org.wso2.carbon.identity.oauth2.dao.TokenMgtDAO;
 import org.wso2.carbon.identity.oauth2.dto.OAuth2AuthorizeReqDTO;
 import org.wso2.carbon.identity.oauth2.token.OauthTokenIssuer;
 import org.wso2.carbon.identity.oauth2.util.OAuth2Util;
@@ -46,7 +45,6 @@ public abstract class AbstractResponseTypeHandler implements ResponseTypeHandler
 
     public static final String IMPLICIT = "implicit";
     protected OauthTokenIssuer oauthIssuerImpl;
-    protected TokenMgtDAO tokenMgtDAO;
     protected boolean cacheEnabled;
     protected OAuthCache oauthCache;
     private OAuthCallbackManager callbackManager;
@@ -55,7 +53,6 @@ public abstract class AbstractResponseTypeHandler implements ResponseTypeHandler
     public void init() throws IdentityOAuth2Exception {
         callbackManager = new OAuthCallbackManager();
         oauthIssuerImpl = OAuthServerConfiguration.getInstance().getIdentityOauthTokenIssuer();
-        tokenMgtDAO = new TokenMgtDAO();
         cacheEnabled = OAuthCache.getInstance().isEnabled();
         if (cacheEnabled) {
             oauthCache = OAuthCache.getInstance();

@@ -63,7 +63,7 @@ import org.wso2.carbon.identity.oauth.dao.OAuthConsumerDAO;
 import org.wso2.carbon.identity.oauth.internal.OAuthComponentServiceHolder;
 import org.wso2.carbon.identity.oauth2.IdentityOAuth2Exception;
 import org.wso2.carbon.identity.oauth2.authz.OAuthAuthzReqMessageContext;
-import org.wso2.carbon.identity.oauth2.dao.TokenMgtDAO;
+import org.wso2.carbon.identity.oauth2.dao.OAuthTokenPersistenceFactory;
 import org.wso2.carbon.identity.oauth2.internal.OAuth2ServiceComponentHolder;
 import org.wso2.carbon.identity.oauth2.model.AccessTokenDO;
 import org.wso2.carbon.identity.oauth2.model.ClientCredentialDO;
@@ -1202,6 +1202,7 @@ public class OAuth2Util {
         return new ArrayList<>();
     }
 
+    @Deprecated
     public static AccessTokenDO getAccessTokenDOfromTokenIdentifier(String accessTokenIdentifier) throws
             IdentityOAuth2Exception {
         boolean cacheHit = false;
@@ -1218,7 +1219,8 @@ public class OAuth2Util {
 
         // cache miss, load the access token info from the database.
         if (accessTokenDO == null) {
-            accessTokenDO = new TokenMgtDAO().retrieveAccessToken(accessTokenIdentifier, false);
+            accessTokenDO = OAuthTokenPersistenceFactory.getInstance().getAccessTokenDAO()
+                    .getAccessToken(accessTokenIdentifier, false);
         }
 
         if (accessTokenDO == null) {
